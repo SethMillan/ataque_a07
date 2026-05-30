@@ -21,7 +21,9 @@ const users = [
  app.use(session({
   secret: 'mysecretkey',
   resave: false,
-  saveUninitialized: false
+  saveUninitialized: false,
+ cookie: { maxAge: 999999999 }  
+
 }));
 
 app.post('/login', (req, res) => {
