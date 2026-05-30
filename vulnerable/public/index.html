@@ -1,0 +1,209 @@
+<!doctype html>
+<html lang="es">
+  <head>
+    <meta charset="UTF-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+    <title>Login</title>
+
+    <style>
+      body {
+        font-family: Arial, sans-serif;
+        background: #f2f2f2;
+        display: flex;
+        justify-content: center;
+        align-items: center;
+        height: 100vh;
+        margin: 0;
+      }
+
+      .login-container {
+        background: white;
+        padding: 30px;
+        width: 320px;
+        border-radius: 10px;
+        box-shadow: 0 2px 15px rgba(0, 0, 0, 0.1);
+      }
+
+      h2 {
+        text-align: center;
+        margin-bottom: 25px;
+      }
+
+      input {
+        width: 100%;
+        padding: 10px;
+        margin: 8px 0;
+        box-sizing: border-box;
+        border: 1px solid #ccc;
+        border-radius: 5px;
+      }
+
+      input:focus {
+        outline: none;
+        border-color: #0078d4;
+      }
+
+      button {
+        width: 100%;
+        padding: 10px;
+        background: #0078d4;
+        color: white;
+        border: none;
+        border-radius: 5px;
+        cursor: pointer;
+        margin-top: 10px;
+      }
+
+      button:hover {
+        background: #0063b1;
+      }
+
+      #dashboardBtn:hover {
+        background: #218838;
+      }
+
+      .counter-box {
+        margin-top: 16px;
+        padding: 10px 14px;
+        border-radius: 6px;
+        background: #fff5f5;
+        border: 1px solid #ffc0c0;
+        display: none;
+      }
+
+      .counter-box.visible {
+        display: block;
+      }
+
+      .counter-box p {
+        margin: 0;
+        font-size: 13px;
+        color: #cc0000;
+        text-align: center;
+      }
+
+      .counter-number {
+        font-size: 28px;
+        font-weight: bold;
+        color: #cc0000;
+        display: block;
+        text-align: center;
+        margin: 4px 0 2px;
+      }
+
+      .counter-label {
+        font-size: 11px;
+        color: #999;
+        text-align: center;
+        display: block;
+      }
+
+      .toast {
+        position: fixed;
+        bottom: 20px;
+        right: 20px;
+        min-width: 250px;
+        max-width: 400px;
+        padding: 15px 20px;
+        border-radius: 8px;
+        color: white;
+        opacity: 0;
+        transform: translateY(20px);
+        transition: all 0.3s ease;
+        pointer-events: none;
+        box-shadow: 0 4px 12px rgba(0, 0, 0, 0.2);
+      }
+
+      .toast.show {
+        opacity: 1;
+        transform: translateY(0);
+      }
+
+      .toast.success { background: #28a745; }
+      .toast.error   { background: #dc3545; }
+    </style>
+  </head>
+  <body>
+    <div class="login-container">
+      <h2>Iniciar Sesión</h2>
+
+      <div id="loginForm">
+        <input type="text"     id="username" placeholder="Usuario" />
+        <input type="password" id="password" placeholder="Contraseña" />
+        <button onclick="login()">Ingresar</button>
+        <button
+          id="dashboardBtn"
+          onclick="irDashboard()"
+          style="background: #28a745;"
+        >
+          Ir al Dashboard
+        </button>
+      </div>
+
+      <div class="counter-box" id="counterBox">
+        <p>⚠️ Sin bloqueo — intentos fallidos:</p>
+        <span class="counter-number" id="counterNumber">0</span>
+        <span class="counter-label">la app no bloquea al atacante</span>
+      </div>
+    </div>
+
+    <div id="toast" class="toast"></div>
+
+    <script>
+      let failCount = 0;
+      const toast = document.getElementById("toast");
+
+      function showToast(message, type = "success") {
+        toast.textContent = message;
+        toast.className = `toast ${type} show`;
+        clearTimeout(toast.timer);
+        toast.timer = setTimeout(() => {
+          toast.classList.remove("show");
+        }, 4000);
+      }
+
+      async function login() {
+        const username = document.getElementById("username").value;
+        const password = document.getElementById("password").value;
+
+        try {
+          const response = await fetch("/login", {
+            method: "POST",
+            headers: { "Content-Type": "application/json" },
+            body: JSON.stringify({ username, password }),
+          });
+
+          const data = await response.json();
+
+          if (data.success) {
+            failCount = 0;
+            document.getElementById("counterBox").classList.remove("visible");
+            document.getElementById("counterNumber").textContent = "0";
+            showToast(data.message || "Inicio de sesión exitoso", "success");
+
+            // Mostrar botón de dashboard
+            document.getElementById("dashboardBtn").style.display = "block";
+          } else {
+            failCount++;
+            document.getElementById("counterNumber").textContent = failCount;
+            document.getElementById("counterBox").classList.add("visible");
+            showToast(
+              data.message || "Usuario o contraseña incorrectos",
+              "error"
+            );
+          }
+        } catch (error) {
+          showToast("Error al conectar con el servidor", "error");
+        }
+      }
+
+      function irDashboard() {
+        window.location.href = "/dashboard";
+      }
+
+      document.addEventListener("keydown", function (e) {
+        if (e.key === "Enter") login();
+      });
+    </script>
+  </body>
+</html>
