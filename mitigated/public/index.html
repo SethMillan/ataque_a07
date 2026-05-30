@@ -3,7 +3,7 @@
   <head>
     <meta charset="UTF-8" />
     <meta name="viewport" content="width=device-width, initial-scale=1.0" />
-    <title>Login</title>
+    <title>Login (Mitigado)</title>
 
     <style>
       body {
@@ -19,14 +19,22 @@
       .login-container {
         background: white;
         padding: 30px;
-        width: 320px;
+        width: 340px;
         border-radius: 10px;
         box-shadow: 0 2px 15px rgba(0, 0, 0, 0.1);
       }
 
       h2 {
         text-align: center;
-        margin-bottom: 25px;
+        margin-bottom: 8px;
+      }
+
+      .subtitle {
+        text-align: center;
+        font-size: 12px;
+        color: #28a745;
+        margin-bottom: 20px;
+        font-weight: bold;
       }
 
       input {
@@ -41,6 +49,11 @@
       input:focus {
         outline: none;
         border-color: #0078d4;
+      }
+
+      input:disabled {
+        background: #f0f0f0;
+        cursor: not-allowed;
       }
 
       button {
@@ -58,44 +71,56 @@
         background: #0063b1;
       }
 
-      #dashboardBtn:hover {
-        background: #218838;
+      button:disabled {
+        background: #999;
+        cursor: not-allowed;
       }
 
-      .counter-box {
+      #dashboardBtn { background: #28a745; display: none; }
+      #dashboardBtn:hover { background: #218838; }
+
+      .info-box {
         margin-top: 16px;
         padding: 10px 14px;
         border-radius: 6px;
-        background: #fff5f5;
-        border: 1px solid #ffc0c0;
+        font-size: 13px;
+        text-align: center;
         display: none;
       }
+      .info-box.visible { display: block; }
 
-      .counter-box.visible {
-        display: block;
-      }
+      .info-box.warn   { background: #fff8e1; border: 1px solid #ffd54f; color: #b26a00; }
+      .info-box.danger { background: #fff5f5; border: 1px solid #ffc0c0; color: #cc0000; }
+      .info-box.locked { background: #fbeaea; border: 1px solid #d9534f; color: #a02525; }
 
-      .counter-box p {
-        margin: 0;
-        font-size: 13px;
-        color: #cc0000;
-        text-align: center;
-      }
-
-      .counter-number {
-        font-size: 28px;
+      .info-box .big {
+        font-size: 22px;
         font-weight: bold;
-        color: #cc0000;
         display: block;
-        text-align: center;
         margin: 4px 0 2px;
       }
 
-      .counter-label {
-        font-size: 11px;
-        color: #999;
-        text-align: center;
-        display: block;
+      .captcha-box {
+        margin-top: 14px;
+        padding: 12px;
+        border-radius: 6px;
+        background: #e8f4fd;
+        border: 1px solid #79b8e6;
+        display: none;
+      }
+      .captcha-box.visible { display: block; }
+
+      .captcha-box label {
+        font-size: 13px;
+        color: #0063b1;
+        font-weight: bold;
+      }
+
+      .captcha-question {
+        font-size: 18px;
+        font-weight: bold;
+        margin: 4px 0;
+        color: #003c75;
       }
 
       .toast {
@@ -114,84 +139,165 @@
         box-shadow: 0 4px 12px rgba(0, 0, 0, 0.2);
       }
 
-      .toast.show {
-        opacity: 1;
-        transform: translateY(0);
-      }
-
+      .toast.show { opacity: 1; transform: translateY(0); }
       .toast.success { background: #28a745; }
       .toast.error   { background: #dc3545; }
+      .toast.warn    { background: #f39c12; }
     </style>
   </head>
   <body>
     <div class="login-container">
       <h2>Iniciar Sesión</h2>
+      <div class="subtitle">🛡️ Versión mitigada</div>
 
       <div id="loginForm">
         <input type="text"     id="username" placeholder="Usuario" />
         <input type="password" id="password" placeholder="Contraseña" />
-        <button onclick="login()">Ingresar</button>
-        <button
-          id="dashboardBtn"
-          onclick="irDashboard()"
-          style="background: #28a745;"
-        >
-          Ir al Dashboard
-        </button>
+
+        <div class="captcha-box" id="captchaBox">
+          <label>Resuelve para continuar:</label>
+          <div class="captcha-question" id="captchaQuestion">—</div>
+          <input type="number" id="captcha" placeholder="Resultado" />
+        </div>
+
+        <button id="loginBtn" onclick="login()">Ingresar</button>
+        <button id="dashboardBtn" onclick="irDashboard()">Ir al Dashboard</button>
       </div>
 
-      <div class="counter-box" id="counterBox">
-        <p>⚠️ Sin bloqueo — intentos fallidos:</p>
-        <span class="counter-number" id="counterNumber">0</span>
-        <span class="counter-label">la app no bloquea al atacante</span>
+      <div class="info-box warn"   id="warnBox">
+        <span>Intentos fallidos</span>
+        <span class="big" id="warnNumber">0</span>
+        <span id="warnLabel">restantes antes del bloqueo</span>
+      </div>
+
+      <div class="info-box locked" id="lockedBox">
+        <span>🔒 Cuenta bloqueada</span>
+        <span class="big" id="lockTimer">--</span>
+        <span>segundos restantes</span>
       </div>
     </div>
 
     <div id="toast" class="toast"></div>
 
     <script>
-      let failCount = 0;
       const toast = document.getElementById("toast");
+      const captchaBox      = document.getElementById("captchaBox");
+      const captchaInput    = document.getElementById("captcha");
+      const captchaQuestion = document.getElementById("captchaQuestion");
+      const warnBox    = document.getElementById("warnBox");
+      const warnNumber = document.getElementById("warnNumber");
+      const warnLabel  = document.getElementById("warnLabel");
+      const lockedBox  = document.getElementById("lockedBox");
+      const lockTimer  = document.getElementById("lockTimer");
+      const loginBtn   = document.getElementById("loginBtn");
+      const userInput  = document.getElementById("username");
+      const passInput  = document.getElementById("password");
+
+      let lockInterval = null;
 
       function showToast(message, type = "success") {
         toast.textContent = message;
         toast.className = `toast ${type} show`;
         clearTimeout(toast.timer);
-        toast.timer = setTimeout(() => {
-          toast.classList.remove("show");
-        }, 4000);
+        toast.timer = setTimeout(() => toast.classList.remove("show"), 4000);
+      }
+
+      function setFormDisabled(disabled) {
+        userInput.disabled  = disabled;
+        passInput.disabled  = disabled;
+        captchaInput.disabled = disabled;
+        loginBtn.disabled   = disabled;
+      }
+
+      function startLockCountdown(seconds) {
+        lockedBox.classList.add("visible");
+        warnBox.classList.remove("visible");
+        captchaBox.classList.remove("visible");
+        setFormDisabled(true);
+        lockTimer.textContent = seconds;
+
+        clearInterval(lockInterval);
+        lockInterval = setInterval(() => {
+          seconds -= 1;
+          if (seconds <= 0) {
+            clearInterval(lockInterval);
+            lockedBox.classList.remove("visible");
+            setFormDisabled(false);
+            showToast("Bloqueo finalizado. Puedes intentar de nuevo.", "success");
+          } else {
+            lockTimer.textContent = seconds;
+          }
+        }, 1000);
+      }
+
+      function showCaptcha(question) {
+        captchaQuestion.textContent = question + " = ?";
+        captchaBox.classList.add("visible");
+        captchaInput.value = "";
+        captchaInput.focus();
+      }
+
+      function hideCaptcha() {
+        captchaBox.classList.remove("visible");
+        captchaInput.value = "";
+      }
+
+      function showRemaining(remaining) {
+        warnNumber.textContent = remaining;
+        warnLabel.textContent = remaining === 1
+          ? "intento restante antes del bloqueo"
+          : "intentos restantes antes del bloqueo";
+        warnBox.classList.add("visible");
       }
 
       async function login() {
-        const username = document.getElementById("username").value;
-        const password = document.getElementById("password").value;
+        const username = userInput.value.trim();
+        const password = passInput.value;
+        const captcha  = captchaInput.value;
+
+        if (!username || !password) {
+          showToast("Completa usuario y contraseña", "warn");
+          return;
+        }
 
         try {
           const response = await fetch("/login", {
             method: "POST",
             headers: { "Content-Type": "application/json" },
-            body: JSON.stringify({ username, password }),
+            body: JSON.stringify({ username, password, captcha }),
           });
 
           const data = await response.json();
 
           if (data.success) {
-            failCount = 0;
-            document.getElementById("counterBox").classList.remove("visible");
-            document.getElementById("counterNumber").textContent = "0";
+            warnBox.classList.remove("visible");
+            lockedBox.classList.remove("visible");
+            hideCaptcha();
             showToast(data.message || "Inicio de sesión exitoso", "success");
-
-            // Mostrar botón de dashboard
             document.getElementById("dashboardBtn").style.display = "block";
-          } else {
-            failCount++;
-            document.getElementById("counterNumber").textContent = failCount;
-            document.getElementById("counterBox").classList.add("visible");
-            showToast(
-              data.message || "Usuario o contraseña incorrectos",
-              "error"
-            );
+            return;
           }
+
+          if (data.locked) {
+            startLockCountdown(data.lockRemaining || 900);
+            showToast(data.message, "error");
+            return;
+          }
+
+          if (data.ipLimited) {
+            showToast(data.message, "error");
+            return;
+          }
+
+          if (data.captchaRequired && data.captchaQuestion) {
+            showCaptcha(data.captchaQuestion);
+          }
+
+          if (typeof data.remaining === "number") {
+            showRemaining(data.remaining);
+          }
+
+          showToast(data.message || "Credenciales incorrectas", "error");
         } catch (error) {
           showToast("Error al conectar con el servidor", "error");
         }
@@ -202,7 +308,7 @@
       }
 
       document.addEventListener("keydown", function (e) {
-        if (e.key === "Enter") login();
+        if (e.key === "Enter" && !loginBtn.disabled) login();
       });
     </script>
   </body>
